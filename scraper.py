@@ -59,7 +59,7 @@ class BB100Page(ParsableWebPage):
         r_raw   = soup.findAll("span", {"class" : "this-week"})
         ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
         
-        print "Extracting albums..."
+        print "Extracting songs..."
         s_raw   = soup.findAll("div", {"class" : "row-title"})
         songs  = [self.clean(str(s.h2.contents[0])) for s in s_raw]
 
