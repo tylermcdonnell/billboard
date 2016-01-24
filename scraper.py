@@ -6,7 +6,7 @@ Created on Oct 2, 2015
 
 import cgi
 import abc
-import urllib2
+import requests
 from bs4 import BeautifulSoup
 
 class ParsableWebPage(object):
@@ -23,7 +23,7 @@ class ParsableWebPage(object):
         s = cgi.escape(s)
 
     def read_page(self):
-        return urllib2.urlopen(self._url).read().decode('utf-8')
+        return requests.get(self._url).text
 
     @abc.abstractmethod
     def parse(self):
@@ -55,15 +55,15 @@ class BB100Page(ParsableWebPage):
         '''
         soup    = BeautifulSoup(self.read_page(), "lxml")
 
-        print "Extracting ranks..."
+        print ("Extracting ranks...")
         r_raw   = soup.findAll("span", {"class" : "this-week"})
         ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
         
-        print "Extracting songs..."
+        print ("Extracting songs...")
         s_raw   = soup.findAll("div", {"class" : "row-title"})
         songs  = [self.clean(str(s.h2.contents[0])) for s in s_raw]
 
-        print "Extracting artists..."
+        print ("Extracting artists...")
         a_raw   = soup.findAll("a", {"data-tracklabel" : "Artist Name"})
         artists = [self.clean(str(a.contents[0])) for a in a_raw]
 
@@ -93,15 +93,15 @@ class BB200Page(ParsableWebPage):
         '''
         soup    = BeautifulSoup(self.read_page(), "lxml")
 
-        print "Extracting ranks..."
+        print ("Extracting ranks...")
         r_raw   = soup.findAll("span", {"class" : "this-week"})
         ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
         
-        print "Extracting albums..."
+        print ("Extracting albums...")
         a_raw   = soup.findAll("div", {"class" : "row-title"})
         albums  = [self.clean(str(a.h2.contents[0])) for a in a_raw]
 
-        print "Extracting artists..."
+        print ("Extracting artists...")
         a_raw   = soup.findAll("a", {"data-tracklabel" : "Artist Name"})
         artists = [self.clean(str(a.contents[0])) for a in a_raw]
 
@@ -109,8 +109,8 @@ class BB200Page(ParsableWebPage):
 
 p = BB200Page("http://www.billboard.com/charts/billboard-200/2015-11-28", "")
 for e in p.parse():
-    print e
+    print (e)
 
-p = BB100Page("http://www.billboard.com/charts/hot-100/2015-11-28", "")
+p = BB100Page("http://www.billboard.com/charts/hot-100", "")
 for e in p.parse():
-    print e
+    print (e)
