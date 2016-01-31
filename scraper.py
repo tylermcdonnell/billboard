@@ -78,7 +78,7 @@ class BB100Page(ParsableWebPage):
 
 class BB200Page(ParsableWebPage):
     '''
-    Scrapes data from Billboard 200 web pages as of 10/2/2015.
+    Scrapes data from Billboard Hot 100 page as of chart week 02/06/2016.
     '''    
 
     def __init__(self, url, date):
