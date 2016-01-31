@@ -62,15 +62,15 @@ class BB100Page(ParsableWebPage):
         '''
         soup    = BeautifulSoup(self.read_page(), "lxml")
 
-        print ("Extracting ranks...")
+        #print ("Extracting ranks...")
         r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
         ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
         
-        print ("Extracting songs...")
+        #print ("Extracting songs...")
         s_raw   = soup.findAll("h2", {"class" : "chart-row__song"})
         songs  = [self.clean(str(s.contents[0])) for s in s_raw]
 
-        print ("Extracting artists...")
+        #print ("Extracting artists...")
         a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
         artists = [self.clean(mlstripper.strip_tags(str(a))) for a in a_raw]
 
@@ -100,20 +100,22 @@ class BB200Page(ParsableWebPage):
         '''
         soup    = BeautifulSoup(self.read_page(), "lxml")
 
-        print ("Extracting ranks...")
+        #print ("Extracting ranks...")
         r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
         ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
         
-        print ("Extracting albums...")
+        #print ("Extracting albums...")
         a_raw   = soup.findAll("h2", {"class" : "chart-row__song"})
         albums  = [self.clean(str(a.contents[0])) for a in a_raw]
 
-        print ("Extracting artists...")
+        #print ("Extracting artists...")
         a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
         artists = [self.clean(mlstripper.strip_tags(str(a))) for a in a_raw]
 
         return [(self._date, z[0], z[1], z[2]) for z in zip(ranks, albums, artists)]
 
+# Sample Usage.
+'''
 p = BB200Page("http://www.billboard.com/charts/billboard-200", "")
 for e in p.parse():
     print (e)
@@ -121,3 +123,4 @@ for e in p.parse():
 p = BB100Page("http://www.billboard.com/charts/hot-100", "")
 for e in p.parse():
     print (e)
+'''
