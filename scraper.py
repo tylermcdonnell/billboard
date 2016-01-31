@@ -72,7 +72,7 @@ class BB100Page(ParsableWebPage):
 
         print ("Extracting artists...")
         a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
-        artists = [self.clean(str(a.a.contents[0])) for a in a_raw]
+        artists = [self.clean(mlstripper.strip_tags(str(a))) for a in a_raw]
 
         return [(self._date, z[0], z[1], z[2]) for z in zip(ranks, songs, artists)]
 
