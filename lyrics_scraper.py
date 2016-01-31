@@ -17,10 +17,12 @@ def _fetch_from_lyricsdotcom(artist, song):
     artist = artist.replace(' ', '-')
     song   = song.replace(' ', '-')
     page   = requests.get('http://www.lyrics.com/%s-lyrics-%s.html' % (song, artist))
+
+    # Extract and process lyrics from page.
     soup   = BeautifulSoup(page.text, 'lxml')
     lyrics = str(soup.findAll('div', {'id' : 'lyrics'}))
     lyrics = mlstripper.strip_tags(lyrics)
-    lyrics = lyrics.replace('\\n', '\n')
+    lyrics = lyrics.replace('\\n', '\n') # Re-encode new lines.
     return lyrics
 
 def _format_name(name):
