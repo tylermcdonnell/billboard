@@ -9,6 +9,13 @@ import abc
 import requests
 from bs4 import BeautifulSoup
 
+# For Python 2, use this import.
+import py2mlstripper as mlstripper
+
+# For Python 3, use this import.
+#import py3mlstripper as mlstripper
+
+
 class ParsableWebPage(object):
     __metaclass__ = abc.ABCMeta
 
@@ -34,7 +41,7 @@ class ParsableWebPage(object):
 
 class BB100Page(ParsableWebPage):
     '''
-    Scrapes data from Billboard Hot 100 page as of 10/2/2015.
+    Scrapes data from Billboard Hot 100 page as of chart week 02/06/2016.
     '''
     def __init__(self, url, date):
         self._url  = url
@@ -45,7 +52,7 @@ class BB100Page(ParsableWebPage):
         '''
         Have a bunch of \t and \n
         '''
-        return s.replace("\t","").replace("\n","")
+        return s.replace("\t","").replace("\n","").strip()
 
     def parse(self):
         '''
@@ -56,16 +63,16 @@ class BB100Page(ParsableWebPage):
         soup    = BeautifulSoup(self.read_page(), "lxml")
 
         print ("Extracting ranks...")
-        r_raw   = soup.findAll("span", {"class" : "this-week"})
+        r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
         ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
         
         print ("Extracting songs...")
-        s_raw   = soup.findAll("div", {"class" : "row-title"})
-        songs  = [self.clean(str(s.h2.contents[0])) for s in s_raw]
+        s_raw   = soup.findAll("h2", {"class" : "chart-row__song"})
+        songs  = [self.clean(str(s.contents[0])) for s in s_raw]
 
         print ("Extracting artists...")
-        a_raw   = soup.findAll("a", {"data-tracklabel" : "Artist Name"})
-        artists = [self.clean(str(a.contents[0])) for a in a_raw]
+        a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
+        artists = [self.clean(str(a.a.contents[0])) for a in a_raw]
 
         return [(self._date, z[0], z[1], z[2]) for z in zip(ranks, songs, artists)]
 
@@ -83,7 +90,7 @@ class BB200Page(ParsableWebPage):
         '''
         Have a bunch of \t and \n
         '''
-        return s.replace("\t","").replace("\n","")
+        return s.replace("\t","").replace("\n","").strip()
 
     def parse(self):
         '''
@@ -94,20 +101,20 @@ class BB200Page(ParsableWebPage):
         soup    = BeautifulSoup(self.read_page(), "lxml")
 
         print ("Extracting ranks...")
-        r_raw   = soup.findAll("span", {"class" : "this-week"})
+        r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
         ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
         
         print ("Extracting albums...")
-        a_raw   = soup.findAll("div", {"class" : "row-title"})
-        albums  = [self.clean(str(a.h2.contents[0])) for a in a_raw]
+        a_raw   = soup.findAll("h2", {"class" : "chart-row__song"})
+        albums  = [self.clean(str(a.contents[0])) for a in a_raw]
 
         print ("Extracting artists...")
-        a_raw   = soup.findAll("a", {"data-tracklabel" : "Artist Name"})
-        artists = [self.clean(str(a.contents[0])) for a in a_raw]
+        a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
+        artists = [self.clean(mlstripper.strip_tags(str(a))) for a in a_raw]
 
         return [(self._date, z[0], z[1], z[2]) for z in zip(ranks, albums, artists)]
 
-p = BB200Page("http://www.billboard.com/charts/billboard-200/2015-11-28", "")
+p = BB200Page("http://www.billboard.com/charts/billboard-200", "")
 for e in p.parse():
     print (e)
 
