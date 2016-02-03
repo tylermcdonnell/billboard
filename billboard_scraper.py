@@ -7,7 +7,9 @@ Created on Oct 2, 2015
 import cgi
 import abc
 import requests
+import datetime
 from bs4 import BeautifulSoup
+from collections import namedtuple
 
 # For Python 2, use this import.
 import py2mlstripper as mlstripper
@@ -15,112 +17,112 @@ import py2mlstripper as mlstripper
 # For Python 3, use this import.
 #import py3mlstripper as mlstripper
 
+# Relevant types.
+Billboard200Entry = namedtuple('Billboard200Entry', ['rank', 'album', 'artist'])
+Hot100Entry       = namedtuple('Hot100Entry', ['rank', 'song', 'artist'])
 
-class ParsableWebPage(object):
-    __metaclass__ = abc.ABCMeta
+# See bottom of file for sample usage.
 
-    def __init__(self, url):
-        self._url = url
-
-    @staticmethod
-    def fix_html(s):
-        '''
-        Resolves common HTML quirks that make parsing a bit annoying.
-        '''
-        s = cgi.escape(s)
-
-    def read_page(self):
-        return requests.get(self._url).text
-
-    @abc.abstractmethod
-    def parse(self):
-        '''
-        Derived classes should implement some parsing scheme for the web page.
-        '''
-        pass
-
-class BB100Page(ParsableWebPage):
+def parse_b200_range(start, end):
     '''
-    Scrapes data from Billboard Hot 100 page as of chart week 02/06/2016.
+    Returns a dictionary of ( date : Billboard200Entry ) for
+    all chart weeks contained in the date range [start,end].
     '''
-    def __init__(self, url, date):
-        self._url  = url
-        self._date = date
+    results = {}
+    base_url = 'http://www.billboard.com/charts/hot-100/'
+    for date in _date_range(start, end, 7):
+        url = ('%s/%s' % (base_url, date))
+        results.update({date : parse_b200(url)})
+    return results
 
-    @staticmethod
-    def clean(s):
-        '''
-        Have a bunch of \t and \n
-        '''
-        return s.replace("\t","").replace("\n","").strip()
-
-    def parse(self):
-        '''
-        Parses this Billboard 200 page and returns scraped tuples of form:
-        
-        (album, artist, date, position)
-        '''
-        soup    = BeautifulSoup(self.read_page(), "lxml")
-
-        #print ("Extracting ranks...")
-        r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
-        ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
-        
-        #print ("Extracting songs...")
-        s_raw   = soup.findAll("h2", {"class" : "chart-row__song"})
-        songs  = [self.clean(str(s.contents[0])) for s in s_raw]
-
-        #print ("Extracting artists...")
-        a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
-        artists = [self.clean(mlstripper.strip_tags(str(a))) for a in a_raw]
-
-        return [(self._date, z[0], z[1], z[2]) for z in zip(ranks, songs, artists)]
-
-class BB200Page(ParsableWebPage):
+def parse_h100_range(start, end):
     '''
-    Scrapes data from Billboard Hot 100 page as of chart week 02/06/2016.
-    '''    
+    Returns a dictionary of ( date : Hot100Entry ) for
+    all chart weeks contained in the date range [start,end].
+    '''
+    base_url = 'http://www.billboard.com/charts/billboard-200/'
+    for date in _date_range(start, end, 7):
+        url = ('%s/%s' % (base_url, date))
+        results.update({date : parse_h100(url)})
+    return results
 
-    def __init__(self, url, date):
-        self._url  = url
-        self._date = date
+def parse_h100(url):
+    '''
+    Parses this Billboard Hot 100 page and returns scraped entries.
+    
+    Arguments:
+    url -- URL of a Hot 100 page.
+    '''        
+    soup    = BeautifulSoup(_get(url), "lxml")
+    
+    #print ("Extracting ranks...")
+    r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
+    ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
+    
+    #print ("Extracting songs...")
+    s_raw   = soup.findAll("h2", {"class" : "chart-row__song"})
+    songs  = [_clean(str(s.contents[0])) for s in s_raw]
+    
+    #print ("Extracting artists...")
+    a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
+    artists = [_clean(mlstripper.strip_tags(str(a))) for a in a_raw]
+    
+    return [Hot100Entry(song=z[0],rank=z[1],artist=z[2]) for z in zip(songs, ranks, artists)]
 
-    @staticmethod
-    def clean(s):
+def parse_b200(url):
+    '''
+    Parses the Billboard 200 page and returns scraped entries.
+    
+    Arguments:
+    url -- URL of a Billboard 200 page.
+    '''
+    soup    = BeautifulSoup(_get(url), "lxml")
+    
+    #print ("Extracting ranks...")
+    r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
+    ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
+    
+    #print ("Extracting albums...")
+    a_raw   = soup.findAll("h2", {"class" : "chart-row__song"})
+    albums  = [_clean(str(a.contents[0])) for a in a_raw]
+    
+    #print ("Extracting artists...")
+    a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
+    artists = [_clean(mlstripper.strip_tags(str(a))) for a in a_raw]
+    
+    return [Billboard200Entry(album=z[0],rank=z[1],artist=z[2]) for z in zip(albums, ranks, artists)]
+
+def _get(url):
+    '''
+    Fetches a URL and returns the html. Returns empty string in case of failure.
+    '''
+    try:
+        return requests.get(url, timeout=3).text
+    except:
+        return ''        
+
+    def _date_range(start, end, delta):
         '''
-        Have a bunch of \t and \n
+        Generates a list of dates in the range [start, end] separated by delta days. 
         '''
-        return s.replace("\t","").replace("\n","").strip()
+        for n in [n for n in range(int((end - start).days) + 1) if n % delta == 0]:
+            yield start + datetime.timedelta(days=n)
 
-    def parse(self):
-        '''
-        Parses this Billboard 200 page and returns scraped tuples of form:
-        
-        (album, artist, date, position)
-        '''
-        soup    = BeautifulSoup(self.read_page(), "lxml")
+def _clean(s):
+    '''
+    Have a bunch of \t and \n.
+    '''
+    return s.replace("\t","").replace("\n","").strip()
 
-        #print ("Extracting ranks...")
-        r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
-        ranks   = [int(r.contents[0]) for r in r_raw] # tags -> int
-        
-        #print ("Extracting albums...")
-        a_raw   = soup.findAll("h2", {"class" : "chart-row__song"})
-        albums  = [self.clean(str(a.contents[0])) for a in a_raw]
-
-        #print ("Extracting artists...")
-        a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
-        artists = [self.clean(mlstripper.strip_tags(str(a))) for a in a_raw]
-
-        return [(self._date, z[0], z[1], z[2]) for z in zip(ranks, albums, artists)]
+def _date_range(start, end, delta):
+    '''
+    Returns dates in range [start,end] separated by delta days.
+    '''
+    for n in [n for n in range(int((end - start).days)) if n % delta == 0]:
+        yield start + datetime.timedelta(days=n)
 
 # Sample Usage.
-'''
-p = BB200Page("http://www.billboard.com/charts/billboard-200", "")
-for e in p.parse():
+for e in parse_b200("http://www.billboard.com/charts/billboard-200"):
     print (e)
-
-p = BB100Page("http://www.billboard.com/charts/hot-100", "")
-for e in p.parse():
+for e in parse_h100("http://www.billboard.com/charts/hot-100"):
     print (e)
-'''
