@@ -101,12 +101,12 @@ def _get(url):
     except:
         return ''        
 
-    def _date_range(start, end, delta):
-        '''
-        Generates a list of dates in the range [start, end] separated by delta days. 
-        '''
-        for n in [n for n in range(int((end - start).days) + 1) if n % delta == 0]:
-            yield start + datetime.timedelta(days=n)
+def _date_range(start, end, delta):
+    '''
+    Generates a list of dates in the range [start, end] separated by delta days. 
+    '''
+    for n in [n for n in range(int((end - start).days) + 1) if n % delta == 0]:
+        yield start + datetime.timedelta(days=n)
 
 def _clean(s):
     '''
