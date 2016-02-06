@@ -1,15 +1,22 @@
 '''
 Created on Oct 2, 2015
 
+Description: This is a script for scraping Billboard Hot 100 and
+Billboard 200 data from the online archives. Billboard is an 
+entertainment media brand known for maintaining music charts which
+track the most popular music in the United States, and has 
+maintained charts since the 1950s.
+
 @author: TSM
 '''
-
 import cgi
 import abc
 import requests
 import datetime
+import pickle
+import traceback
 from bs4 import BeautifulSoup
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 
 # For Python 2, use this import.
 import py2mlstripper as mlstripper
@@ -17,43 +24,95 @@ import py2mlstripper as mlstripper
 # For Python 3, use this import.
 #import py3mlstripper as mlstripper
 
+
 # Relevant types.
-Billboard200Entry = namedtuple('Billboard200Entry', ['rank', 'album', 'artist'])
-Hot100Entry       = namedtuple('Hot100Entry', ['rank', 'song', 'artist'])
+Billboard200Entry = namedtuple('Billboard200Entry', ['date', 'rank', 'album', 'artist'])
+Hot100Entry       = namedtuple('Hot100Entry', ['date', 'rank', 'song', 'artist'])
 
-# See bottom of file for sample usage.
+# Sample Usage: Scrape the most recent chart and save it to file.
+'''
+save("b200", scrape_b200('http://www.billboard.com/charts/billboard-200'))
+save("h100", scrape_h100('http://www.billboard.com/charts/hot-100'))
+'''
 
-def parse_b200_range(start, end):
+# Sample Usage: Scrape all archived data.
+'''
+first_h100_chart = datetime.date(1958, 9, 6)
+first_b200_chart = datetime.date(1983,11, 5)
+today            = datetime.datetime.now()
+
+save("b200", scrape_b200_range(first_b200_chart, today))
+save("h100", scrape_h100_range(first_h100_chart, today))
+'''
+
+# Sample Usage: Save pickled data after parsing.
+'''
+save("b200", scrape_b200("http://www.billboard.com/charts/billboard-200"))
+save("h100", scrape_h100("http://www.billboard.com/charts/hot-100"))
+'''
+
+# Sample Usage: Load archive and print in chronological order.
+'''
+archive = load('b200')
+for date in sorted(archive.keys()):
+    print ("\n----- Billboard 200 Chart for %s ---- " % date)
+    for entry in archive[date]:
+        print (entry)
+'''
+
+# Sample Usage: Print chart run of a particular album.
+# Note: These types are made for scraping data in the most general
+#       sense. They are obviously not optimized for these types of
+#       queries. But it is easy to do so.
+'''
+archive = load('b200')
+album  = "1989"
+artist = "Taylor Swift" 
+for entry in [e for e in archive if e.album == album and e.artist == artist].sort(key=lambda t: t.date):
+    print entry
+'''
+
+def scrape_b200_range(start, end):
     '''
     Returns a dictionary of ( date : Billboard200Entry ) for
     all chart weeks contained in the date range [start,end].
     '''
-    results = {}
-    base_url = 'http://www.billboard.com/charts/hot-100/'
+    results = []
     for date in _date_range(start, end, 7):
-        url = ('%s/%s' % (base_url, date))
-        results.update({date : parse_b200(url)})
+        print ("Scraping Billboard 200 for Week of %s" % date)
+        try:
+            chart = scrape_b200(date)
+        except: 
+            print ("Failed to scrape %s" % date)
+            chart = []
+        results.append(chart)
     return results
 
-def parse_h100_range(start, end):
+def scrape_h100_range(start, end):
     '''
     Returns a dictionary of ( date : Hot100Entry ) for
     all chart weeks contained in the date range [start,end].
     '''
-    base_url = 'http://www.billboard.com/charts/billboard-200/'
+    results = []
     for date in _date_range(start, end, 7):
-        url = ('%s/%s' % (base_url, date))
-        results.update({date : parse_h100(url)})
+        print ("Scraping Hot 100 for Week of %s" % date)
+        try:
+            chart = scrape_h100(date)
+        except:
+            print ("Failed to scrape %s" % date)
+            chart = []
+        results.append(chart)
     return results
 
-def parse_h100(url):
+def scrape_h100(date):
     '''
     Parses this Billboard Hot 100 page and returns scraped entries.
     
     Arguments:
     url -- URL of a Hot 100 page.
-    '''        
-    soup    = BeautifulSoup(_get(url), "lxml")
+    '''
+    base_url = 'http://www.billboard.com/charts/hot-100/'
+    soup    = BeautifulSoup(_get('%s%s' % (base_url, date)), "lxml")
     
     #print ("Extracting ranks...")
     r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
@@ -67,16 +126,17 @@ def parse_h100(url):
     a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
     artists = [_clean(mlstripper.strip_tags(str(a))) for a in a_raw]
     
-    return [Hot100Entry(song=z[0],rank=z[1],artist=z[2]) for z in zip(songs, ranks, artists)]
+    return [Hot100Entry(date=date,song=z[0],rank=z[1],artist=z[2]) for z in zip(songs, ranks, artists)]
 
-def parse_b200(url):
+def scrape_b200(date):
     '''
     Parses the Billboard 200 page and returns scraped entries.
     
     Arguments:
     url -- URL of a Billboard 200 page.
     '''
-    soup    = BeautifulSoup(_get(url), "lxml")
+    base_url = 'http://www.billboard.com/charts/billboard-200/'
+    soup    = BeautifulSoup(_get('%s%s' % (base_url, date)), "lxml")
     
     #print ("Extracting ranks...")
     r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
@@ -90,8 +150,16 @@ def parse_b200(url):
     a_raw   = soup.findAll("h3", {"class" : "chart-row__artist"})
     artists = [_clean(mlstripper.strip_tags(str(a))) for a in a_raw]
     
-    return [Billboard200Entry(album=z[0],rank=z[1],artist=z[2]) for z in zip(albums, ranks, artists)]
+    return [Billboard200Entry(date=date, album=z[0],rank=z[1],artist=z[2]) for z in zip(albums, ranks, artists)]
 
+def save(filename, chart_data):
+    with open('%s.pickle' % filename, 'wb') as handle:
+        pickle.dump(chart_data, handle)
+
+def load(filename):
+    with open('%s.pickle' % filename, 'rb') as handle:
+        return pickle.load(handle)
+    
 def _get(url):
     '''
     Fetches a URL and returns the html. Returns empty string in case of failure.
@@ -120,9 +188,3 @@ def _date_range(start, end, delta):
     '''
     for n in [n for n in range(int((end - start).days)) if n % delta == 0]:
         yield start + datetime.timedelta(days=n)
-
-# Sample Usage.
-for e in parse_b200("http://www.billboard.com/charts/billboard-200"):
-    print (e)
-for e in parse_h100("http://www.billboard.com/charts/hot-100"):
-    print (e)
