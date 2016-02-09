@@ -9,61 +9,41 @@ maintained charts since the 1950s.
 
 @author: TSM
 '''
-import cgi
-import abc
 import requests
 import datetime
 import pickle
-import traceback
 from bs4 import BeautifulSoup
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 
 # For Python 2, use this import.
-import py2mlstripper as mlstripper
+#import py2mlstripper as mlstripper
 
 # For Python 3, use this import.
-#import py3mlstripper as mlstripper
+import py3mlstripper as mlstripper
 
 
 # Relevant types.
 Billboard200Entry = namedtuple('Billboard200Entry', ['date', 'rank', 'album', 'artist'])
 Hot100Entry       = namedtuple('Hot100Entry', ['date', 'rank', 'song', 'artist'])
 
-# Sample Usage: Scrape the most recent chart and save it to file.
+# Sample Usage: Scrape all archived data and save in chronological order.
 '''
-save("b200", scrape_b200('http://www.billboard.com/charts/billboard-200'))
-save("h100", scrape_h100('http://www.billboard.com/charts/hot-100'))
-'''
+today = datetime.date.today()
 
-# Sample Usage: Scrape all archived data.
-'''
 first_h100_chart = datetime.date(1958, 9, 6)
+history = scrape_h100_range(first_h100_chart, today)
+history.sort(key=lambda e : (e.date, e.rank))
+print (history)
+save('h100', history)
+
 first_b200_chart = datetime.date(1983,11, 5)
-today            = datetime.datetime.now()
-
-save("b200", scrape_b200_range(first_b200_chart, today))
-save("h100", scrape_h100_range(first_h100_chart, today))
-'''
-
-# Sample Usage: Save pickled data after parsing.
-'''
-save("b200", scrape_b200("http://www.billboard.com/charts/billboard-200"))
-save("h100", scrape_h100("http://www.billboard.com/charts/hot-100"))
-'''
-
-# Sample Usage: Load archive and print in chronological order.
-'''
-archive = load('b200')
-for date in sorted(archive.keys()):
-    print ("\n----- Billboard 200 Chart for %s ---- " % date)
-    for entry in archive[date]:
-        print (entry)
+history = scrape_b200_range(first_b200_chart, today)
+history.sort(key=lambda e : (e.date, e.rank))
+save("b200", history)
 '''
 
 # Sample Usage: Print chart run of a particular album.
-# Note: These types are made for scraping data in the most general
-#       sense. They are obviously not optimized for these types of
-#       queries. But it is easy to do so.
+# Note: This script is for scraping. It's obviously not optimized for this. BUT, it's easy.
 '''
 archive = load('b200')
 album  = "1989"
@@ -74,8 +54,9 @@ for entry in [e for e in archive if e.album == album and e.artist == artist].sor
 
 def scrape_b200_range(start, end):
     '''
-    Returns a dictionary of ( date : Billboard200Entry ) for
-    all chart weeks contained in the date range [start,end].
+    Returns a list of Billboard200Entry for all dates in [start,end].
+    
+    Note: start must be a valid date of a billboard chart!
     '''
     results = []
     for date in _date_range(start, end, 7):
@@ -85,13 +66,14 @@ def scrape_b200_range(start, end):
         except: 
             print ("Failed to scrape %s" % date)
             chart = []
-        results.append(chart)
+        results.extend(chart)
     return results
 
 def scrape_h100_range(start, end):
     '''
-    Returns a dictionary of ( date : Hot100Entry ) for
-    all chart weeks contained in the date range [start,end].
+    Returns a list of Hot100Entry for all dates in [start,end].
+    
+    Note: start must be a valid date of a billboard chart!
     '''
     results = []
     for date in _date_range(start, end, 7):
@@ -101,7 +83,7 @@ def scrape_h100_range(start, end):
         except:
             print ("Failed to scrape %s" % date)
             chart = []
-        results.append(chart)
+        results.extend(chart)
     return results
 
 def scrape_h100(date):
@@ -112,7 +94,7 @@ def scrape_h100(date):
     url -- URL of a Hot 100 page.
     '''
     base_url = 'http://www.billboard.com/charts/hot-100/'
-    soup    = BeautifulSoup(_get('%s%s' % (base_url, date)), "lxml")
+    soup    = BeautifulSoup(_get('%s%s' % (base_url, date)))
     
     #print ("Extracting ranks...")
     r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
@@ -136,7 +118,7 @@ def scrape_b200(date):
     url -- URL of a Billboard 200 page.
     '''
     base_url = 'http://www.billboard.com/charts/billboard-200/'
-    soup    = BeautifulSoup(_get('%s%s' % (base_url, date)), "lxml")
+    soup    = BeautifulSoup(_get('%s%s' % (base_url, date)))
     
     #print ("Extracting ranks...")
     r_raw   = soup.findAll("span", {"class" : "chart-row__current-week"})
@@ -181,10 +163,3 @@ def _clean(s):
     Have a bunch of \t and \n.
     '''
     return s.replace("\t","").replace("\n","").strip()
-
-def _date_range(start, end, delta):
-    '''
-    Returns dates in range [start,end] separated by delta days.
-    '''
-    for n in [n for n in range(int((end - start).days)) if n % delta == 0]:
-        yield start + datetime.timedelta(days=n)
